@@ -1,8 +1,6 @@
 package exercise2;
 
-import de.hpi.dbs2.exercise2.AbstractBPlusTree;
-import de.hpi.dbs2.exercise2.BPlusTreeNode;
-import de.hpi.dbs2.exercise2.ValueReference;
+import de.hpi.dbs2.exercise2.*;
 
 public class Ex2Main {
     public static void main(String[] args) {
@@ -45,6 +43,11 @@ public class Ex2Main {
 
         AbstractBPlusTree tree = new BPlusTreeJava(root);
         System.out.println(tree);
+
+        LeafNode leafNode = new LeafNode(4);
+        System.out.println(leafNode);
+        InnerNode innerNode = new InnerNode(4);
+        System.out.println(innerNode);
 
         /*
          * playground

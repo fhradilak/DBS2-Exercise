@@ -23,9 +23,7 @@ public class BPlusTreeJava extends AbstractBPlusTree {
     @Nullable
     @Override
     public ValueReference insert(@NotNull Integer key, @NotNull ValueReference value) {
-        //throw new UnsupportedOperationException("~~~ your implementation here ~~~");
-
-        LeafNode newLeaf = new LeafNode(order);
+        throw new UnsupportedOperationException("~~~ your implementation here ~~~");
 
         // Find LeafNode in which the key has to be inserted.
         //   It is a good idea to track the "path" to the LeafNode in a Stack or something alike.

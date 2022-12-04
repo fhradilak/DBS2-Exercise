@@ -1,10 +1,10 @@
 package exercise2
 
-import com.sun.jdi.IntegerType
 import de.hpi.dbs2.ChosenImplementation
 import de.hpi.dbs2.exercise2.*
-import java.util.Stack
+import java.util.*
 import kotlin.math.ceil
+import kotlin.math.floor
 
 @ChosenImplementation(true)
 class BPlusTreeKotlin : AbstractBPlusTree {
@@ -43,7 +43,9 @@ class BPlusTreeKotlin : AbstractBPlusTree {
         //   leafNode.keys[pos] = key;
         //   leafNode.references[pos] = value;
         //   Don't forget to update the parent keys and so on...
-        //   I DON'T THINK THAT THE PARENT KEY HAS TO BE UPDATED IF THERE IS STILL SPACE!
+
+        var newNode : BPlusTreeNode<*> = leaf
+        var shouldStillInsert = false
 
         if (!leaf.isFull) {
             var newKeys = mutableListOf<Int>()
@@ -67,38 +69,145 @@ class BPlusTreeKotlin : AbstractBPlusTree {
                 leaf.keys[index] = newKeys[index]
                 leaf.references[index] = newValues[index]
             }
-            return null;
+        } else {
+
+            // Otherwise
+            //   Split the LeafNode in two!
+            //   Is parent node root?
+            //     update rootNode = ... // will have only one key
+            //   Was node instanceof LeafNode?
+            //     update parentNode.keys[?] = ...
+            //   Don't forget to update the parent keys and so on...
+
+            if (rootNode.height == 0) {
+                // replace InitialRootNode with LeafNode
+                var leafKeys = leaf.keys
+                var leafReferences = leaf.references
+                leaf = LeafNode(order)
+                for (index in leafKeys.indices) {
+                    leaf.keys[index] = leafKeys[index]
+                    leaf.references[index] = leafReferences[index]
+                }
+            }
+
+            // split leaf
+            var newLeaf = LeafNode(order)
+            var newIndex = 0
+            // create list with all keys
+            var newKeys = mutableListOf<Int>()
+            var newValues = mutableListOf<ValueReference>()
+            var inserted = false
+            for ((index, key) in leaf.keys.withIndex()) {
+                if (key == null) continue
+                if (searchKey < key && !inserted) {
+                    newKeys.add(searchKey)
+                    newValues.add(value)
+                    inserted = true
+                }
+                newKeys.add(key)
+                newValues.add(leaf.references[index])
+            }
+            if (!inserted) {
+                newKeys.add(searchKey)
+                newValues.add(value)
+            }
+            // divide keys over both nodes
+            for (index in newKeys.indices) {
+                if (index < ceil(newKeys.size / 2.0)) {
+                    leaf.keys[index] = newKeys[index]
+                    leaf.references[index] = newValues[index]
+                } else {
+                    newLeaf.keys[newIndex] = newKeys[index]
+                    newLeaf.references[newIndex] = newValues[index]
+                    if (index < leaf.keys.size) {
+                        leaf.keys[index] = null
+                        leaf.references[index] = null
+                    }
+                    newIndex++
+                }
+            }
+            newLeaf.nextSibling = leaf.nextSibling
+            leaf.nextSibling = newLeaf
+
+            if (rootNode.height == 0) {
+                // create new root if leaf was root
+                rootNode = InnerNode(order, leaf, newLeaf)
+                return null
+            }
+
+            newNode = newLeaf
+            shouldStillInsert = true
+
         }
 
-        // Otherwise
-        //   Split the LeafNode in two!
-        //   Is parent node root?
-        //     update rootNode = ... // will have only one key
-        //   Was node instanceof LeafNode?
-        //     update parentNode.keys[?] = ...
-        //   Don't forget to update the parent keys and so on...
+        while(visitedNodes.size > 0) {
+            var inner = visitedNodes.pop() as InnerNode
 
-        if(leaf.height == 0) {
-            // replace InitialRootNode with LeafNode
-            var leafKeys = leaf.keys;
-            var leafReferences = leaf.references;
-            leaf = BPlusTreeNode.buildTree(order) as LeafNode;
-            leaf.keys = leafKeys;
-            leaf.references = leafReferences;
-        }
+            var newSmallestKeys = mutableListOf<Int>()
+            var newReferences = mutableListOf<BPlusTreeNode<*>>()
+            for (reference in inner.references) {
+                if(reference != null) {
+                    if (shouldStillInsert && newNode.smallestKey < reference.smallestKey) {
+                        newReferences.add(newNode)
+                        newSmallestKeys.add(newNode.smallestKey)
+                        shouldStillInsert = false
+                    }
+                    newReferences.add(reference)
+                    newSmallestKeys.add(reference.smallestKey)
+                }
+            }
+            if(shouldStillInsert) {
+                newReferences.add(newNode)
+                newSmallestKeys.add(newNode.smallestKey)
+            }
 
-        var newLeaf = BPlusTreeNode.buildTree(order) as LeafNode
-        var newIndex = 0
-        for (index in leaf.keys.indices) {
-            if (index >= ceil(leaf.keys.size / 2.0)) {
-                newLeaf.keys[newIndex] = leaf.keys[index]
-                newLeaf.references[newIndex] = leaf.references[index]
+            // not full yet
+            if (newReferences.size <= order) {
+                for(index in inner.references.indices) {
+                    if(index < newReferences.size) {
+                        inner.references[index] = newReferences[index]
+                        if(index + 1 < newSmallestKeys.size) {
+                            inner.keys[index] = newSmallestKeys[index + 1]
+                        }
+                    } else {
+                        inner.references[index] = null
+                        if(index + 1 < newSmallestKeys.size) {
+                            inner.keys[index] = null
+                        }
+                    }
+                }
+                shouldStillInsert = false
+            } else {
+                // split inner node
+                var newInner = InnerNode(order)
+                var referencesLeft = floor(newReferences.size / 2.0)
+                var newIndex = 0
+                for (index in newReferences.indices) {
+                    if(index <= referencesLeft) {
+                        inner.references[index] = newReferences[index]
+                        if(index >= 1) {
+                            inner.keys[index - 1] = newSmallestKeys[index]
+                        }
+                    } else {
+                        newInner.references[newIndex] = newReferences[index]
+                        if(newIndex >= 1) {
+                            newInner.keys[newIndex - 1] = newSmallestKeys[index]
+                        }
+                        if(index < inner.references.size) {
+                            inner.keys[index - 1] = null
+                            inner.references[index] = null
+                        }
+                        newIndex ++
+                    }
+                }
+                if(visitedNodes.size == 0) {
+                    rootNode = InnerNode(order, inner, newInner)
+                    return null
+                }
+                newNode = newInner
+                shouldStillInsert = true
             }
         }
-        newLeaf.nextSibling = leaf.nextSibling;
-        leaf.nextSibling = newLeaf;
-
-        if
 
 
 

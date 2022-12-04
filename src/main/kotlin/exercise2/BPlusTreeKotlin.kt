@@ -2,7 +2,6 @@ package exercise2
 
 import de.hpi.dbs2.ChosenImplementation
 import de.hpi.dbs2.exercise2.*
-import java.util.*
 import kotlin.math.ceil
 import kotlin.math.floor
 
@@ -12,212 +11,150 @@ class BPlusTreeKotlin : AbstractBPlusTree {
     constructor(rootNode: BPlusTreeNode<*>) : super(rootNode)
 
     override fun insert(key: Int, value: ValueReference): ValueReference? {
-        val searchKey = key
+        if (getOrNull(key) != null)
+            return replaceValueForPresentKey(key, value)
 
-        // Find LeafNode in which the key has to be inserted.
-        //   It is a good idea to track the "path" to the LeafNode in a Stack or something alike.
+        insertIntoNode(key, value, rootNode)
+        return null
+    }
 
-        var currentNode = rootNode
-        var visitedNodes = Stack<BPlusTreeNode<*>>()
-
-        visitedNodes.push(rootNode)
-        while (currentNode.height > 0) { // while current Node is not a LeafNode
-            currentNode = (currentNode as InnerNode).selectChild(searchKey)
-            visitedNodes.push(currentNode)
-        }
-        var leaf = visitedNodes.pop() as LeafNode
-
-        // Does the key already exist? Overwrite!
-        //   leafNode.references[pos] = value;
-        //   But remember return the old value!
-
+    /**
+     * Replace value for a given key return old value or null if not present.
+     */
+    private fun replaceValueForPresentKey(searchKey: Int, value: ValueReference): ValueReference? {
+        val leaf = rootNode.findLeaf(searchKey)
         for ((index, key) in leaf.keys.withIndex()) {
-            if(searchKey.equals(key)) {
-                var oldValue = leaf.references[index]
+            if (searchKey == key) {
+                val oldValue = leaf.references[index]
                 leaf.references[index] = value
                 return oldValue
             }
         }
-
-        // New key - Is there still space?
-        //   leafNode.keys[pos] = key;
-        //   leafNode.references[pos] = value;
-        //   Don't forget to update the parent keys and so on...
-
-        var newNode : BPlusTreeNode<*> = leaf
-        var shouldStillInsert = false
-
-        if (!leaf.isFull) {
-            var newKeys = mutableListOf<Int>()
-            var newValues = mutableListOf<ValueReference>()
-            var inserted = false
-            for ((index, key) in leaf.keys.withIndex()) {
-                if (key == null) continue
-                if(searchKey < key && !inserted) {
-                    newKeys.add(searchKey)
-                    newValues.add(value)
-                    inserted = true
-                }
-                newKeys.add(key)
-                newValues.add(leaf.references[index])
-            }
-            if(!inserted) {
-                newKeys.add(searchKey)
-                newValues.add(value)
-            }
-            for(index in newKeys.indices) {
-                leaf.keys[index] = newKeys[index]
-                leaf.references[index] = newValues[index]
-            }
-        } else {
-
-            // Otherwise
-            //   Split the LeafNode in two!
-            //   Is parent node root?
-            //     update rootNode = ... // will have only one key
-            //   Was node instanceof LeafNode?
-            //     update parentNode.keys[?] = ...
-            //   Don't forget to update the parent keys and so on...
-
-            if (rootNode.height == 0) {
-                // replace InitialRootNode with LeafNode
-                var leafKeys = leaf.keys
-                var leafReferences = leaf.references
-                leaf = LeafNode(order)
-                for (index in leafKeys.indices) {
-                    leaf.keys[index] = leafKeys[index]
-                    leaf.references[index] = leafReferences[index]
-                }
-            }
-
-            // split leaf
-            var newLeaf = LeafNode(order)
-            var newIndex = 0
-            // create list with all keys
-            var newKeys = mutableListOf<Int>()
-            var newValues = mutableListOf<ValueReference>()
-            var inserted = false
-            for ((index, key) in leaf.keys.withIndex()) {
-                if (key == null) continue
-                if (searchKey < key && !inserted) {
-                    newKeys.add(searchKey)
-                    newValues.add(value)
-                    inserted = true
-                }
-                newKeys.add(key)
-                newValues.add(leaf.references[index])
-            }
-            if (!inserted) {
-                newKeys.add(searchKey)
-                newValues.add(value)
-            }
-            // divide keys over both nodes
-            for (index in newKeys.indices) {
-                if (index < ceil(newKeys.size / 2.0)) {
-                    leaf.keys[index] = newKeys[index]
-                    leaf.references[index] = newValues[index]
-                } else {
-                    newLeaf.keys[newIndex] = newKeys[index]
-                    newLeaf.references[newIndex] = newValues[index]
-                    if (index < leaf.keys.size) {
-                        leaf.keys[index] = null
-                        leaf.references[index] = null
-                    }
-                    newIndex++
-                }
-            }
-            newLeaf.nextSibling = leaf.nextSibling
-            leaf.nextSibling = newLeaf
-
-            if (rootNode.height == 0) {
-                // create new root if leaf was root
-                rootNode = InnerNode(order, leaf, newLeaf)
-                return null
-            }
-
-            newNode = newLeaf
-            shouldStillInsert = true
-
-        }
-
-        while(visitedNodes.size > 0) {
-            var inner = visitedNodes.pop() as InnerNode
-
-            var newSmallestKeys = mutableListOf<Int>()
-            var newReferences = mutableListOf<BPlusTreeNode<*>>()
-            for (reference in inner.references) {
-                if(reference != null) {
-                    if (shouldStillInsert && newNode.smallestKey < reference.smallestKey) {
-                        newReferences.add(newNode)
-                        newSmallestKeys.add(newNode.smallestKey)
-                        shouldStillInsert = false
-                    }
-                    newReferences.add(reference)
-                    newSmallestKeys.add(reference.smallestKey)
-                }
-            }
-            if(shouldStillInsert) {
-                newReferences.add(newNode)
-                newSmallestKeys.add(newNode.smallestKey)
-            }
-
-            // not full yet
-            if (newReferences.size <= order) {
-                for(index in inner.references.indices) {
-                    if(index < newReferences.size) {
-                        inner.references[index] = newReferences[index]
-                        if(index + 1 < newSmallestKeys.size) {
-                            inner.keys[index] = newSmallestKeys[index + 1]
-                        }
-                    } else {
-                        inner.references[index] = null
-                        if(index + 1 < newSmallestKeys.size) {
-                            inner.keys[index] = null
-                        }
-                    }
-                }
-                shouldStillInsert = false
-            } else {
-                // split inner node
-                var newInner = InnerNode(order)
-                var referencesLeft = floor(newReferences.size / 2.0)
-                var newIndex = 0
-                for (index in newReferences.indices) {
-                    if(index <= referencesLeft) {
-                        inner.references[index] = newReferences[index]
-                        if(index >= 1) {
-                            inner.keys[index - 1] = newSmallestKeys[index]
-                        }
-                    } else {
-                        newInner.references[newIndex] = newReferences[index]
-                        if(newIndex >= 1) {
-                            newInner.keys[newIndex - 1] = newSmallestKeys[index]
-                        }
-                        if(index < inner.references.size) {
-                            inner.keys[index - 1] = null
-                            inner.references[index] = null
-                        }
-                        newIndex ++
-                    }
-                }
-                if(visitedNodes.size == 0) {
-                    rootNode = InnerNode(order, inner, newInner)
-                    return null
-                }
-                newNode = newInner
-                shouldStillInsert = true
-            }
-        }
-
-
-
-        // Check out the exercise slides for a flow chart of this logic.
-        // If you feel stuck, try to draw what you want to do and
-        // check out Ex2Main for playing around with the tree by e.g. printing or debugging it.
-        // Also check out all the methods on BPlusTreeNode and how they are implemented or
-        // the tests in BPlusTreeNodeTests and BPlusTreeTests!
-
-
         return null
     }
+
+    /**
+     * Generate correctly sorted lists of all keys and values that have to be inside a leaf after adding a new entry
+     */
+    private fun updatedKeysAndValuesLists(leaf: LeafNode, newKey: Int, newValue: ValueReference): Pair<List<Int>, List<ValueReference>> {
+        val updatedKeys = leaf.keys.toMutableList()
+        val updatedValues = leaf.references.toMutableList()
+        for ((index, key) in updatedKeys.withIndex()) {
+            if (key == null || newKey < key) {
+                updatedKeys.add(index, newKey)
+                updatedValues.add(index, newValue)
+                return Pair(updatedKeys.filterNotNull(), updatedValues.filterNotNull())
+            }
+        }
+        updatedKeys.add(newKey)
+        updatedValues.add(newValue)
+        return Pair(updatedKeys.filterNotNull(), updatedValues.filterNotNull())
+    }
+
+    /**
+     * Generate correctly sorted list of all references to children nodes that have to be inside an inner node after adding a new reference.
+     * If no new reference should be added just return list with current reference.
+     */
+    private fun updatedReferencesList(inner: InnerNode, newReference: BPlusTreeNode<*>?): List<BPlusTreeNode<*>> {
+        val updatedReferences = inner.references.toMutableList()
+        if (newReference == null)
+            return updatedReferences.filterNotNull()
+        for ((index, reference) in updatedReferences.withIndex()) {
+            if (reference == null || newReference.smallestKey < reference.smallestKey) {
+                updatedReferences.add(index, newReference)
+                return updatedReferences.filterNotNull()
+            }
+        }
+        updatedReferences.add(newReference)
+        return updatedReferences.filterNotNull()
+    }
+
+    /**
+     * Generate list of keys for a list of references.
+     * Key i will be the smallest key in reference i+1's leafs.
+     */
+    private fun keysForReferenceList(references: List<BPlusTreeNode<*>>): MutableList<Int> {
+        val keys = mutableListOf<Int>()
+        for (index in 1 until references.size)
+            keys.add(references[index].smallestKey)
+        return keys
+    }
+
+    /**
+     * Replace the keys and references for a node with the values from a list.
+     */
+    private fun <V> overwriteKeysAndReferences(node: BPlusTreeNode<V>, keys: List<Int>, references: List<V>) {
+        for (index in node.keys.indices) {
+            if (index < keys.size)
+                node.keys[index] = keys[index]
+            else
+                node.keys[index] = null
+        }
+        for (index in node.references.indices)
+            if (index < references.size)
+                node.references[index] = references[index]
+            else
+                node.references[index] = null
+    }
+
+
+    /**
+     * Recursively add a new key value pair into the subtree of a given node.
+     * Return the newly created Node if a split happened or null otherwise.
+     */
+    private fun insertIntoNode(key: Int, value: ValueReference, _node: BPlusTreeNode<*>): BPlusTreeNode<*>? {
+        // this will be returned
+        var newNode: BPlusTreeNode<*>?
+        // work with local copy so we can overwrite this
+        var node = _node
+
+        // Base case: node is a leaf
+        if (node.height == 0) {
+            val (updatedKeys, updatedValues) = updatedKeysAndValuesLists(node as LeafNode, key, value)
+            // if there is still space
+            if (!node.isFull) {
+                overwriteKeysAndReferences(node, updatedKeys, updatedValues)
+                return null
+            }
+            // if leaf was InitialRootNode, replace it with normal leaf Node
+            if (rootNode.height == 0)
+                node = LeafNode(order)
+            // split node
+            newNode = LeafNode(order)
+            newNode.nextSibling = node.nextSibling
+            node.nextSibling = newNode
+            val referenceCountLeft = ceil(updatedValues.size / 2.0).toInt()
+            overwriteKeysAndReferences(node, updatedKeys.take(referenceCountLeft), updatedValues.take(referenceCountLeft))
+            overwriteKeysAndReferences(newNode, updatedKeys.drop(referenceCountLeft), updatedValues.drop(referenceCountLeft))
+        } else {
+            // node is InnerNode
+
+            // recursive call to correct child
+            val newReference = insertIntoNode(key, value, (node as InnerNode).selectChild(key))
+            val updatedReferences = updatedReferencesList(node, newReference)
+            // if it still fits inside current node
+            if (updatedReferences.size <= order) {
+                overwriteKeysAndReferences(node, keysForReferenceList(updatedReferences), updatedReferences)
+                return null
+            }
+            // split node
+            newNode = InnerNode(order)
+            val referenceCountLeft = floor(updatedReferences.size / 2.0).toInt()
+            overwriteKeysAndReferences(node,
+                    keysForReferenceList(updatedReferences.take(referenceCountLeft)),
+                    updatedReferences.take(referenceCountLeft))
+            overwriteKeysAndReferences(
+                    newNode,
+                    keysForReferenceList(updatedReferences.drop(referenceCountLeft)),
+                    updatedReferences.drop(referenceCountLeft))
+        }
+
+        // if node is root, create new root
+        if (node.height == rootNode.height)
+            rootNode = InnerNode(order, node, newNode)
+
+        return newNode
+    }
+
+
 }

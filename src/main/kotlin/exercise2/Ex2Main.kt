@@ -5,7 +5,7 @@ import de.hpi.dbs2.exercise2.BPlusTreeNode
 import de.hpi.dbs2.exercise2.*
 
 fun main() {
-    val order = 4
+    val order = 3
 
     val tree = BPlusTreeKotlin(order)
     tree.insert(1, ref(1))

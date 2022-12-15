@@ -6,7 +6,7 @@ import de.hpi.dbs2.exercise3.InnerJoinOperation;
 import de.hpi.dbs2.exercise3.JoinAttributePair;
 import org.jetbrains.annotations.NotNull;
 
-@ChosenImplementation(true)
+@ChosenImplementation(false)
 public class HashEquiInnerJoinJava extends InnerJoinOperation {
 
 	public HashEquiInnerJoinJava(

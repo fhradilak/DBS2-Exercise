@@ -23,11 +23,11 @@ fun main() {
 
     with(
         DBMS(
-            totalBlocks = 5,
-            blockCapacity = 10
+            totalBlocks = 12,
+            blockCapacity = 10,
         )
     ) {
-        val leftInputRelation = File(".\\src\\test\\resources\\exercise3\\title.basics.sample.tsv")
+        val leftInputRelation = File("./src/test/resources/exercise3/title.basics.sample.tsv")
             .also { println("Using \"$it\" as input relation 1") }.inputStream()
             .use {
                 createRelation(blockManager, leftColumnDefinition)
@@ -41,7 +41,7 @@ fun main() {
                         )
                     }
             }
-        val rightInputRelation = File(".\\src\\test\\resources\\exercise3\\title.principals.sample.tsv")
+        val rightInputRelation = File("./src/test/resources/exercise3/title.principals.sample.tsv")
             .also { println("Using \"$it\" as input relation 2") }.inputStream()
             .use {
                 createRelation(blockManager, rightColumnDefinition)
@@ -65,18 +65,13 @@ fun main() {
 
         val leftColumnIndex = 0
         val rightColumnIndex = 0
-        val nleij: JoinOperation =
-            NestedLoopEquiInnerJoin(blockManager, leftColumnIndex, rightColumnIndex)
-        val hashBucketCount = 10
         val heij: JoinOperation =
-            HashEquiInnerJoinJava(blockManager, leftColumnIndex, rightColumnIndex)
+            HashEquiInnerJoinKotlin(blockManager, leftColumnIndex, rightColumnIndex)
 
-        val outputColumnDefinition = nleij.buildOutputColumns(leftInputRelation, rightInputRelation)
-        // val outputColumnDefinition = heij.buildOutputColumns(leftInputRelation, rightInputRelation);
+        val outputColumnDefinition = heij.buildOutputColumns(leftInputRelation, rightInputRelation);
         val outputRelation: Relation = createRelation(blockManager, outputColumnDefinition)
 
-        nleij.join(leftInputRelation, rightInputRelation, outputRelation)
-        // heij.join(inputRelation1, inputRelation2, outputRelation)
+        heij.join(leftInputRelation, rightInputRelation, outputRelation)
 
         println("OutputRelation:")
         outputRelation.printlnAllBlocks()

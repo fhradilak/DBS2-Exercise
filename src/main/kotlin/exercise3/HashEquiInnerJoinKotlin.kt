@@ -4,7 +4,7 @@ import de.hpi.dbs2.ChosenImplementation
 import de.hpi.dbs2.dbms.*
 import de.hpi.dbs2.exercise3.InnerJoinOperation
 import de.hpi.dbs2.exercise3.JoinAttributePair
-import de.hpi.dbs2.exercise3.NestedLoopEquiInnerJoin.TupleAppender
+import java.util.function.Consumer
 
 @ChosenImplementation(false)
 class HashEquiInnerJoinKotlin(
@@ -31,8 +31,7 @@ class HashEquiInnerJoinKotlin(
         rightInputRelation: Relation,
         outputRelation: Relation
     ) {
-        val bucketCount: Int = blockManager.freeBlocks - 1
-        // TODO:
+        //
         //  - calculate a sensible bucket count
         //  - hash relation
 
@@ -41,8 +40,6 @@ class HashEquiInnerJoinKotlin(
 
         //  - join hashed blocks
 
-        val leftI = 0//JoinAttributePair.EquiJoinAttributePair.leftColumnIndex
-        val rightI = 0//JoinAttributePair.rightColumnIndex
         val tupleAppender = TupleAppender(outputRelation.getBlockOutput())
 
         for (i in 0..leftBuffers.size) {
@@ -55,13 +52,11 @@ class HashEquiInnerJoinKotlin(
                         l,
                         r,
                         outputRelation.columns,
-                        tupleAppender
+                        tupleAppender as Consumer<Tuple>,
                     )
                 }
             }
         }
-
-        TODO()
 
     }
 
@@ -70,17 +65,17 @@ class HashEquiInnerJoinKotlin(
     }
 
     fun partition(
-        leftInputRelation: Relation,
+        inputRelation: Relation,
     ): ArrayList<ArrayList<Block>> {
-        val bucketNumber: Int = blockManager.freeBlocks - 1;
+        val bucketNumber: Int = blockManager.freeBlocks - 1
         val diskBuffers = arrayListOf<ArrayList<Block>>()
         val buffers = arrayListOf<Block>()
 
         for (i in 0..bucketNumber) {
             buffers[i] = blockManager.allocate(true)
         }
-        for (leftBlockRef: Block in leftInputRelation) {
-            val block = blockManager.load(leftBlockRef)
+        for (blockRef: Block in inputRelation) {
+            val block = blockManager.load(blockRef)
             for (tuple: Tuple in block) {
                 val blockNumber = hash(tuple, bucketNumber)
                 if (buffers[blockNumber].isFull()) {
@@ -106,6 +101,25 @@ class HashEquiInnerJoinKotlin(
         return diskBuffers
     }
 
+    internal inner class TupleAppender(var blockOutput: BlockOutput) : AutoCloseable,
+        Consumer<Tuple?> {
+        var outputBlock: Block = blockManager.allocate(true)
+        override fun accept(tuple: Tuple?) {
+            if (outputBlock.isFull()) {
+                blockOutput.move(outputBlock)
+                outputBlock = blockManager.allocate(true)
+            }
+            outputBlock.append(tuple!!)
+        }
+
+        override fun close() {
+            if (!outputBlock.isEmpty()) {
+                blockOutput.move(outputBlock)
+            } else {
+                blockManager.release(outputBlock, false)
+            }
+        }
+    }
 
 }
 

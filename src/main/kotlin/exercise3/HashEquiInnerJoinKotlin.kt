@@ -66,11 +66,9 @@ class HashEquiInnerJoinKotlin(
             }
             blockManager.release(block, false)
         }
-        // iterate over all buckets and save their buffers to disc if they are not empty
+        // iterate over all buckets and save their buffers to disc
         for (bucket in buckets) {
-            if (!bucket[0].isEmpty()) {
-                bucket[0] = blockManager.release(bucket[0], true)!!
-            }
+            bucket[0] = blockManager.release(bucket[0], true)!!
         }
         // return the buckets
         return buckets
